@@ -1,0 +1,71 @@
+package com.qianbajin.watchdog;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+import dalvik.system.PathClassLoader;
+import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
+/**
+ * @author wWX407408
+ * @Created at 2018/1/4  11:09
+ * @des
+ */
+
+public class HookLoader implements IXposedHookLoadPackage {
+
+    /**
+     * 实际处理hook逻辑的类
+     */
+    private static final String HANDLE_HOOK_CLASS = WatchDogHook.class.getName();
+
+    /**
+     * 需要hook的应用包名
+     */
+    private static final List<String> hookPkg = new ArrayList<>();
+
+    /**
+     * 添加需要hook的程序包名
+     */
+    static {
+       hookPkg.add(BuildConfig.APPLICATION_ID);
+       hookPkg.add(Constant.PGK_ALI);
+       hookPkg.add(Constant.PGK_WECHAT);
+       hookPkg.add(Constant.PGK_QQ);
+       hookPkg.add(Constant.PGK_S_HEALTH);
+       hookPkg.add(Constant.PGK_PINGAN);
+    }
+
+    @Override
+    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
+        if (hookPkg.contains(lpparam.packageName)) {
+            PathClassLoader pathClassLoader = new PathClassLoader(getApkPath(BuildConfig.APPLICATION_ID), XposedBridge.BOOTCLASSLOADER);
+//            Class<?> handleHookClass = pathClassLoader.loadClass(HANDLE_HOOK_CLASS);
+            Class<?> handleHookClass = Class.forName(HANDLE_HOOK_CLASS, true, pathClassLoader);
+            Object instance = handleHookClass.newInstance();
+            Method handleLoadPackage = handleHookClass.getDeclaredMethod("handleLoadPackage", XC_LoadPackage.LoadPackageParam.class);
+            handleLoadPackage.invoke(instance, lpparam);
+        }
+    }
+
+    /**
+     * 获取本apk文件路径
+     * @param packageName 本应用包名
+     * @return  apk绝对路径
+     * @throws FileNotFoundException  文件不存在
+     */
+    private String getApkPath(String packageName) throws FileNotFoundException {
+        File apkFile = new File("/data/app/" + packageName + "-1/base.apk");
+        if (!apkFile.exists()) {
+            apkFile = new File("/data/app/" + packageName + "-2/base.apk");
+        }
+        if (!apkFile.exists()) {
+            throw new FileNotFoundException("apk文件没找到");
+        }
+        return apkFile.getAbsolutePath();
+    }
+}
